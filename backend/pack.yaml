@@ -11,6 +11,10 @@ variables:
     - PROJECT_NAME
     - PROJECT_SLUG
     - DOMAIN
+    - STACK
+    - API_STYLE
+    - TESTING
+    - LANG
 
 requirements:
   - id: REQ-001
