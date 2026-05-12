@@ -1,0 +1,410 @@
+schema_version: "1.1.0"
+
+metadata:
+  name: "Parking Management Frontend Domain Pack"
+  version: "1.1.0"
+  language: "en"
+  project_type: "frontend"
+
+variables:
+  required:
+    - PROJECT_NAME
+    - PROJECT_SLUG
+    - DOMAIN
+    - STACK
+    - API_STYLE
+    - TESTING
+    - LANG
+
+requirements:
+  - id: REQ-FE-001
+    title: "Show parking capacity and threshold status"
+    priority: Must
+    description: "Operators need a dashboard that makes occupancy, availability, and threshold alerts visible at a glance."
+    status: Draft
+
+  - id: REQ-FE-002
+    title: "Provide vehicle entry workflow"
+    priority: Must
+    description: "Gate operators need a form to submit vehicle entry and confirm ticket assignment when capacity is available."
+    status: Draft
+
+  - id: REQ-FE-003
+    title: "Display calculated parking fee before payment"
+    priority: Must
+    description: "Drivers need to review the calculated fee, tariff, and ticket details before continuing to payment."
+    status: Draft
+
+  - id: REQ-FE-004
+    title: "List vehicles that exceeded allowed duration"
+    priority: Should
+    description: "Operators need an enforcement board that surfaces overstays and supports follow-up action."
+    status: Draft
+
+  - id: REQ-FE-005
+    title: "Show receipt delivery status"
+    priority: Should
+    description: "Drivers need confirmation that a successful payment receipt was sent through the selected contact channel."
+    status: Draft
+
+bounded_contexts:
+  - id: BC-FE-001
+    name: Parking Operations UI
+    type: Core
+    responsibility: "Operator-facing capacity, entry, occupancy, and enforcement workflows"
+    aggregates:
+      - FacilityDashboardState
+      - VehicleEntryFormState
+      - EnforcementBoardState
+
+  - id: BC-FE-002
+    name: Billing UI
+    type: Supporting
+    responsibility: "Driver-facing fee review, payment handoff, and receipt confirmation workflows"
+    aggregates:
+      - FeeReviewState
+      - ReceiptStatusState
+
+use_cases:
+  - id: UC-FE-001
+    name: View Capacity Dashboard
+    actor: Operator
+    requirement: REQ-FE-001
+    query: GetFacilityOccupancyQuery
+    aggregate: FacilityDashboardState
+    emits:
+      - CapacityThresholdVisible
+    scenarios:
+      - SCN-FE-001
+    status: Draft
+
+  - id: UC-FE-002
+    name: Submit Vehicle Entry
+    actor: Gate Operator
+    requirement: REQ-FE-002
+    command: SubmitVehicleEntryCommand
+    aggregate: VehicleEntryFormState
+    emits:
+      - VehicleEntryConfirmed
+    scenarios:
+      - SCN-FE-002
+    status: Draft
+
+  - id: UC-FE-003
+    name: Review Parking Fee
+    actor: Driver
+    requirement: REQ-FE-003
+    query: GetParkingFeeQuoteQuery
+    aggregate: FeeReviewState
+    emits:
+      - ParkingFeeQuoteDisplayed
+    scenarios:
+      - SCN-FE-003
+    status: Draft
+
+  - id: UC-FE-004
+    name: Review Overstay Board
+    actor: Operator
+    requirement: REQ-FE-004
+    query: GetOverstayCasesQuery
+    aggregate: EnforcementBoardState
+    emits:
+      - OverstayCasesVisible
+    scenarios:
+      - SCN-FE-004
+    status: Draft
+
+  - id: UC-FE-005
+    name: View Receipt Status
+    actor: Driver
+    requirement: REQ-FE-005
+    query: GetReceiptStatusQuery
+    aggregate: ReceiptStatusState
+    emits:
+      - ReceiptDeliveryStatusDisplayed
+    scenarios:
+      - SCN-FE-005
+    status: Draft
+
+commands:
+  - id: CMD-FE-001
+    name: SubmitVehicleEntryCommand
+    use_case: UC-FE-002
+    fields:
+      - facility_id
+      - gate_id
+      - license_plate
+      - entry_time
+
+queries:
+  - id: QRY-FE-001
+    name: GetFacilityOccupancyQuery
+    use_case: UC-FE-001
+    returns:
+      - facility_id
+      - capacity
+      - occupancy_count
+      - available_spots
+      - threshold_status
+
+  - id: QRY-FE-002
+    name: GetParkingFeeQuoteQuery
+    use_case: UC-FE-003
+    returns:
+      - ticket_id
+      - license_plate
+      - duration_minutes
+      - tariff_id
+      - amount
+      - currency
+
+  - id: QRY-FE-003
+    name: GetOverstayCasesQuery
+    use_case: UC-FE-004
+    returns:
+      - session_id
+      - license_plate
+      - parked_duration
+      - allowed_duration
+      - exceeded_by_minutes
+
+  - id: QRY-FE-004
+    name: GetReceiptStatusQuery
+    use_case: UC-FE-005
+    returns:
+      - ticket_id
+      - payment_id
+      - delivery_channel
+      - receipt_status
+
+aggregates:
+  - id: AGG-FE-001
+    name: FacilityDashboardState
+    context: Parking Operations UI
+    invariants:
+      - "Available spots are derived from capacity minus occupancy."
+      - "Threshold alerts must be visible when occupancy meets or exceeds configured threshold."
+
+  - id: AGG-FE-002
+    name: VehicleEntryFormState
+    context: Parking Operations UI
+    invariants:
+      - "License plate is required before submitting vehicle entry."
+      - "Entry confirmation must include a ticket id."
+
+  - id: AGG-FE-003
+    name: FeeReviewState
+    context: Billing UI
+    invariants:
+      - "Fee review must show amount, currency, tariff, and ticket reference."
+      - "Payment handoff is available only after a fee quote is loaded."
+
+  - id: AGG-FE-004
+    name: EnforcementBoardState
+    context: Parking Operations UI
+    invariants:
+      - "Overstay cases must show exceeded duration."
+      - "Follow-up action must preserve the case reference."
+
+  - id: AGG-FE-005
+    name: ReceiptStatusState
+    context: Billing UI
+    invariants:
+      - "Receipt status must be tied to a paid ticket."
+      - "Delivery channel must be visible to the driver."
+
+value_objects:
+  - id: VO-FE-001
+    name: CapacityIndicator
+    fields:
+      - occupancy_count
+      - capacity
+      - available_spots
+      - threshold_status
+    invariants:
+      - "Available spots cannot be negative."
+
+  - id: VO-FE-002
+    name: TicketReference
+    fields:
+      - ticket_id
+      - license_plate
+    invariants:
+      - "Ticket id must be present for confirmed sessions."
+
+  - id: VO-FE-003
+    name: FeeQuote
+    fields:
+      - amount
+      - currency
+      - tariff_id
+      - duration_minutes
+    invariants:
+      - "Amount cannot be negative."
+
+events:
+  - id: EVT-FE-001
+    name: CapacityThresholdVisible
+    type: ui
+    producer: FacilityDashboardState
+    consumers:
+      - Operator
+    payload:
+      - facility_id
+      - occupancy_count
+      - threshold_status
+
+  - id: EVT-FE-002
+    name: VehicleEntryConfirmed
+    type: ui
+    producer: VehicleEntryFormState
+    consumers:
+      - Gate Operator
+    payload:
+      - ticket_id
+      - facility_id
+      - license_plate
+
+  - id: EVT-FE-003
+    name: ParkingFeeQuoteDisplayed
+    type: ui
+    producer: FeeReviewState
+    consumers:
+      - Driver
+    payload:
+      - ticket_id
+      - amount
+      - currency
+      - tariff_id
+
+  - id: EVT-FE-004
+    name: OverstayCasesVisible
+    type: ui
+    producer: EnforcementBoardState
+    consumers:
+      - Operator
+    payload:
+      - session_id
+      - license_plate
+      - exceeded_by_minutes
+
+  - id: EVT-FE-005
+    name: ReceiptDeliveryStatusDisplayed
+    type: ui
+    producer: ReceiptStatusState
+    consumers:
+      - Driver
+    payload:
+      - ticket_id
+      - payment_id
+      - delivery_channel
+      - receipt_status
+
+outputs:
+  files:
+    - target: "AI_RULES.md"
+      template: "templates/AI_RULES.md.tpl"
+    - target: "spec.md"
+      template: "templates/spec.md.tpl"
+
+rules:
+  traceability:
+    target: "docs/specs/traceability.md"
+    include_existing_rows: true
+    default_status: "Draft"
+
+scenarios:
+  - id: "SCN-FE-001"
+    requirement_id: REQ-FE-001
+    use_case: UC-FE-001
+    seed: true
+    target: "features/dashboard/occupancy_dashboard.feature"
+    template: "templates/features/dashboard/occupancy_dashboard.feature.tpl"
+    feature: "Parking Operations Dashboard"
+    scenario: "Operator views capacity status and threshold alert"
+    query: GetFacilityOccupancyQuery
+    aggregate: FacilityDashboardState
+    events:
+      - CapacityThresholdVisible
+    technical_artifacts:
+      - "Dashboard route"
+      - "Capacity summary component"
+      - "Threshold alert component"
+    test_artifact: "occupancy_dashboard.steps"
+    status: "Draft"
+
+  - id: "SCN-FE-002"
+    requirement_id: REQ-FE-002
+    use_case: UC-FE-002
+    seed: true
+    target: "features/entry_exit/vehicle_entry_form.feature"
+    template: "templates/features/entry_exit/vehicle_entry_form.feature.tpl"
+    feature: "Vehicle Entry UI"
+    scenario: "Gate operator registers vehicle entry with an available slot"
+    command: SubmitVehicleEntryCommand
+    aggregate: VehicleEntryFormState
+    events:
+      - VehicleEntryConfirmed
+    technical_artifacts:
+      - "Entry route"
+      - "License plate form"
+      - "Ticket confirmation panel"
+    test_artifact: "vehicle_entry_form.steps"
+    status: "Draft"
+
+  - id: "SCN-FE-003"
+    requirement_id: REQ-FE-003
+    use_case: UC-FE-003
+    seed: true
+    target: "features/billing/fee_review.feature"
+    template: "templates/features/billing/fee_review.feature.tpl"
+    feature: "Parking Fee Review"
+    scenario: "Driver reviews calculated fee before payment"
+    query: GetParkingFeeQuoteQuery
+    aggregate: FeeReviewState
+    events:
+      - ParkingFeeQuoteDisplayed
+    technical_artifacts:
+      - "Billing route"
+      - "Fee summary component"
+      - "Payment handoff action"
+    test_artifact: "fee_review.steps"
+    status: "Draft"
+
+  - id: "SCN-FE-004"
+    requirement_id: REQ-FE-004
+    use_case: UC-FE-004
+    seed: true
+    target: "features/enforcement/overstay_board.feature"
+    template: "templates/features/enforcement/overstay_board.feature.tpl"
+    feature: "Overstay Enforcement Board"
+    scenario: "Operator reviews vehicles that exceeded allowed duration"
+    query: GetOverstayCasesQuery
+    aggregate: EnforcementBoardState
+    events:
+      - OverstayCasesVisible
+    technical_artifacts:
+      - "Enforcement route"
+      - "Overstay cases table"
+      - "Follow-up action"
+    test_artifact: "overstay_board.steps"
+    status: "Draft"
+
+  - id: "SCN-FE-005"
+    requirement_id: REQ-FE-005
+    use_case: UC-FE-005
+    seed: true
+    target: "features/notifications/receipt_status.feature"
+    template: "templates/features/notifications/receipt_status.feature.tpl"
+    feature: "Receipt Delivery Status"
+    scenario: "Driver sees receipt delivery confirmation after payment"
+    query: GetReceiptStatusQuery
+    aggregate: ReceiptStatusState
+    events:
+      - ReceiptDeliveryStatusDisplayed
+    technical_artifacts:
+      - "Receipt route"
+      - "Receipt status component"
+      - "Delivery channel indicator"
+    test_artifact: "receipt_status.steps"
+    status: "Draft"
