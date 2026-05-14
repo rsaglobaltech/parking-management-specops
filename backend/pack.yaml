@@ -2,7 +2,7 @@ schema_version: "1.1.0"
 
 metadata:
   name: "Parking Management Backend Domain Pack"
-  version: "1.1.0"
+  version: "1.2.0"
   language: "en"
   project_type: "backend"
 
@@ -45,6 +45,12 @@ requirements:
     title: "Send receipt after successful payment"
     priority: Should
     description: "Drivers receive confirmation after payment succeeds."
+    status: Draft
+
+  - id: REQ-006
+    title: "Join a waitlist when the facility is full"
+    priority: Should
+    description: "Drivers can join a waitlist when no parking spots are available and receive notification when a spot opens."
     status: Draft
 
 bounded_contexts:
@@ -124,6 +130,18 @@ use_cases:
       - SCN-005
     status: Draft
 
+  - id: UC-006
+    name: Join Capacity Waitlist
+    actor: Driver
+    requirement: REQ-006
+    command: JoinWaitlistCommand
+    aggregate: ParkingFacility
+    emits:
+      - DriverWaitlisted
+    scenarios:
+      - SCN-006
+    status: Draft
+
 commands:
   - id: CMD-001
     name: CheckCapacityThresholdCommand
@@ -163,6 +181,14 @@ commands:
     fields:
       - payment_id
       - session_id
+      - driver_contact
+
+  - id: CMD-006
+    name: JoinWaitlistCommand
+    use_case: UC-006
+    fields:
+      - facility_id
+      - license_plate
       - driver_contact
 
 aggregates:
@@ -252,6 +278,18 @@ events:
     payload:
       - payment_id
       - session_id
+      - occurred_at
+
+  - id: EVT-006
+    name: DriverWaitlisted
+    type: domain
+    producer: ParkingFacility
+    consumers:
+      - Notifications
+    payload:
+      - facility_id
+      - license_plate
+      - position
       - occurred_at
 
 outputs:
@@ -356,4 +394,22 @@ scenarios:
       - "Notification router"
       - "ReceiptSent event"
     test_artifact: "payment_receipt.steps"
+    status: "Draft"
+
+  - id: "SCN-006"
+    requirement_id: REQ-006
+    use_case: UC-006
+    seed: true
+    target: "features/waitlist/capacity_waitlist.feature"
+    template: "templates/features/waitlist/capacity_waitlist.feature.tpl"
+    feature: "Capacity Waitlist"
+    scenario: "Joining the waitlist when the facility is full"
+    command: JoinWaitlistCommand
+    aggregate: ParkingFacility
+    events:
+      - DriverWaitlisted
+    technical_artifacts:
+      - "Waitlist service"
+      - "DriverWaitlisted event"
+    test_artifact: "capacity_waitlist.steps"
     status: "Draft"
